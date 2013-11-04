@@ -1,0 +1,35 @@
+Exploratory Work
+========================================================
+
+Required Packages
+```{r}
+list.of.packages <- c("ggplot2", "ggmap")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+rm(list.of.packages, new.packages)
+library(ggplot2)
+library(ggmap)
+
+```
+
+
+Plotting on maps
+----------------
+
+Lots of good info here: https://dl.dropboxusercontent.com/u/24648660/ggmap%20useR%202012.pdf
+
+Partial example from above source:
+```{r}
+houston <- get_map('houston', zoom = 14)
+HoustonMap <- ggmap(houston, extent = 'device', legend = 'topleft')
+HoustonMap
+```
+
+Map of USA
+```{r}
+usa <- get_map('usa', zoom = 4)
+usaMap <- ggmap(usa, extent = 'device', legend = 'topleft')
+usaMap
+```
+
+
