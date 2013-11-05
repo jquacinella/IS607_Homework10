@@ -1,3 +1,6 @@
+.RData
+.Rhistory
+
 *.py[cod]
 
 # C extensions
