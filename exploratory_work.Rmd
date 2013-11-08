@@ -1,7 +1,9 @@
 Exploratory Work
-========================================================
+================
 
 Required Packages
+-----------------
+
 ```{r}
 list.of.packages <- c("ggplot2", "ggmap", "rjson", "ROAuth", "twitteR", "streamR", "wordcloud", "tm", "plyr")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
@@ -20,22 +22,22 @@ library("ROAuth")
 library("twitteR")
 library("streamR")
 library("wordcloud")
-library("tm")
 
 # Text tools
-library(plyr)
-
+library("tm")
+library("plyr")
+library("stringr")
 ```
 
 
 Getting Data From Twitter
 -------------------------
 
-On first run, create an OAuth object. This generates a URL, which needs to be opened to generate a custom PIN number.
-Enter it when asked by the handshake(...) function and you'll be authenticated. The code then saves this oauth object
-to file, so we can load it without reauthoirzing again
+On first run, we need to create an OAuth object. This generates a URL, which needs to be opened to generate a custom PIN number. Enter this PIN when asked by the handshake(...) function and you'll be authenticated. The code then saves this oauth object to file, so we can load it without reauthoirzing again.
+
 Taken from: http://davetang.org/muse/2013/04/06/using-the-r_twitter-package/
 
+```{r eval=FALSE}
 download.file(url="http://curl.haxx.se/ca/cacert.pem", destfile="cacert.pem")
 cred <- OAuthFactory$new(consumerKey='hJFNU2CUnrWP7wtYrOmdw',
                         consumerSecret='mYpRIVG92xbk58rFg1UDwGH4xKryWpgyz3obaqDVqM',
@@ -43,10 +45,12 @@ cred <- OAuthFactory$new(consumerKey='hJFNU2CUnrWP7wtYrOmdw',
                         accessURL='http://api.twitter.com/oauth/access_token',
                         authURL='http://api.twitter.com/oauth/authorize')
 cred$handshake(cainfo="cacert.pem")
-Enter in PIN
+# Enter in PIN
 registerTwitterOAuth(cred)
 save(list="cred", file="twitteR_credentials")
+```
 
+However, we'll just load the credentials from file.
 
 ```{r}
 # Sign into twitter
@@ -58,7 +62,8 @@ obamacaretweets <- searchTwitter("#obamacare", n=1500, cainfo="cacert.pem")
 obamacaretweets_text <- sapply(obamacaretweets, function(x) x$getText())
 ```
 
-Wordcloud
+Generating a Wordcloud
+----------------------
 
 ```{r}
 # Create a corpus and turn it into a word cloud
@@ -66,6 +71,7 @@ obamacaretweets_corpus <- Corpus(VectorSource(obamacaretweets_text))
 obamacaretweets_corpus <- tm_map(obamacaretweets_corpus, tolower)
 obamacaretweets_corpus <- tm_map(obamacaretweets_corpus, removePunctuation)
 obamacaretweets_corpus <- tm_map(obamacaretweets_corpus, function(x)removeWords(x,stopwords()))
+obamacaretweets_corpus <- tm_map(obamacaretweets_corpus, function(x)removeWords(x, c("obamacare")))
 wordcloud(obamacaretweets_corpus)
 ```
 
@@ -81,14 +87,11 @@ pos.words = scan('positive-words.txt', what='character', comment.char=';')
 neg.words = scan('negative-words.txt', what='character', comment.char=';')
 ```
 
+### Score sentiment function per Jeffrey Breen
 
-Score sentiment function per Jeffrey Breen
 ```{r}
 score.sentiment = function(sentences, pos.words, neg.words, .progress='none')
 {
-   require(plyr)
-	 require(stringr)
-	
 	 # we got a vector of sentences. plyr will handle a list or a vector as an "l" for us
 	 # we want a simple array of scores back, so we use "l" + "a" + "ply" = laply:
 	 scores = laply(sentences, function(sentence, pos.words, neg.words) {
@@ -120,8 +123,7 @@ score.sentiment = function(sentences, pos.words, neg.words, .progress='none')
 }
 ```
 
-
-Example / Sanity check
+### Example / Sanity check
 
 ```{r eval=FALSE}
 sample = c("You're awesome and I love you",
@@ -132,7 +134,8 @@ result = score.sentiment(sample, pos.words, neg.words)
 
 ```
 
-Score obama tweets
+### Score Obamacare Tweets
+
 ```{r}
 result <- score.sentiment(obamacaretweets_text, pos.words, neg.words)
 
@@ -146,14 +149,16 @@ Plotting on maps
 
 Lots of good info here: https://dl.dropboxusercontent.com/u/24648660/ggmap%20useR%202012.pdf
 
-Partial example from above source:
+### Partial example from above source:
+
 ```{r}
 houston <- get_map('houston', zoom = 14)
 HoustonMap <- ggmap(houston, extent = 'device', legend = 'topleft')
 HoustonMap
 ```
 
-Map of USA
+### Map of USA
+
 ```{r}
 usa <- get_map('usa', zoom = 4)
 usaMap <- ggmap(usa, extent = 'device', legend = 'topleft')
