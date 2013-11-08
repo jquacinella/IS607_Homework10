@@ -3,13 +3,141 @@ Exploratory Work
 
 Required Packages
 ```{r}
-list.of.packages <- c("ggplot2", "ggmap")
+list.of.packages <- c("ggplot2", "ggmap", "rjson", "ROAuth", "twitteR", "streamR", "wordcloud", "tm", "plyr")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 rm(list.of.packages, new.packages)
+
+# Maps
 library(ggplot2)
 library(ggmap)
 
+# JSON
+library(rjson)
+
+# Twitter
+library("ROAuth")
+library("twitteR")
+library("streamR")
+library("wordcloud")
+library("tm")
+
+# Text tools
+library(plyr)
+
+```
+
+
+Getting Data From Twitter
+-------------------------
+
+On first run, create an OAuth object. This generates a URL, which needs to be opened to generate a custom PIN number.
+Enter it when asked by the handshake(...) function and you'll be authenticated. The code then saves this oauth object
+to file, so we can load it without reauthoirzing again
+Taken from: http://davetang.org/muse/2013/04/06/using-the-r_twitter-package/
+
+download.file(url="http://curl.haxx.se/ca/cacert.pem", destfile="cacert.pem")
+cred <- OAuthFactory$new(consumerKey='hJFNU2CUnrWP7wtYrOmdw',
+                        consumerSecret='mYpRIVG92xbk58rFg1UDwGH4xKryWpgyz3obaqDVqM',
+                        requestURL='http://api.twitter.com/oauth/request_token',
+                        accessURL='http://api.twitter.com/oauth/access_token',
+                        authURL='http://api.twitter.com/oauth/authorize')
+cred$handshake(cainfo="cacert.pem")
+Enter in PIN
+registerTwitterOAuth(cred)
+save(list="cred", file="twitteR_credentials")
+
+
+```{r}
+# Sign into twitter
+load("twitteR_credentials")
+registerTwitterOAuth(cred)
+
+# Get Tweets on ObamaCare and store their text
+obamacaretweets <- searchTwitter("#obamacare", n=1500, cainfo="cacert.pem")
+obamacaretweets_text <- sapply(obamacaretweets, function(x) x$getText())
+```
+
+Wordcloud
+
+```{r}
+# Create a corpus and turn it into a word cloud
+obamacaretweets_corpus <- Corpus(VectorSource(obamacaretweets_text))
+obamacaretweets_corpus <- tm_map(obamacaretweets_corpus, tolower)
+obamacaretweets_corpus <- tm_map(obamacaretweets_corpus, removePunctuation)
+obamacaretweets_corpus <- tm_map(obamacaretweets_corpus, function(x)removeWords(x,stopwords()))
+wordcloud(obamacaretweets_corpus)
+```
+
+Analyzing Sentiment
+-------------------
+
+Download Hu & Liu’s opinion lexicon:
+site - http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html
+files - http://www.cs.uic.edu/~liub/FBS/opinion-lexicon-English.rar (downloaded Nov. 8, 2013)
+
+```{r}
+pos.words = scan('positive-words.txt', what='character', comment.char=';') 
+neg.words = scan('negative-words.txt', what='character', comment.char=';')
+```
+
+
+Score sentiment function per Jeffrey Breen
+```{r}
+score.sentiment = function(sentences, pos.words, neg.words, .progress='none')
+{
+   require(plyr)
+	 require(stringr)
+	
+	 # we got a vector of sentences. plyr will handle a list or a vector as an "l" for us
+	 # we want a simple array of scores back, so we use "l" + "a" + "ply" = laply:
+	 scores = laply(sentences, function(sentence, pos.words, neg.words) {
+	 	
+	 	 # clean up sentences with R's regex-driven global substitute, gsub():
+	 	 sentence = gsub('[[:punct:]]', '', sentence)
+	 	 sentence = gsub('[[:cntrl:]]', '', sentence)
+	 	 sentence = gsub('\\d+', '', sentence)
+	 	 # and convert to lower case:
+	 	 sentence = tolower(sentence)
+	 	 # split into words. str_split is in the stringr package
+	 	 word.list = str_split(sentence, '\\s+')
+	 	 # sometimes a list() is one level of hierarchy too much
+	 	 words = unlist(word.list)
+	 	 # compare our words to the dictionaries of positive & negative terms
+	 	 pos.matches = match(words, pos.words)
+	 	 neg.matches = match(words, neg.words)
+	
+	 	 # match() returns the position of the matched term or NA
+	 	 # we just want a TRUE/FALSE:
+	 	 pos.matches = !is.na(pos.matches)
+	 	 neg.matches = !is.na(neg.matches)
+	 	 # and conveniently enough, TRUE/FALSE will be treated as 1/0 by sum():
+	 	 score = sum(pos.matches) - sum(neg.matches)
+	 	 return(score)
+	 }, pos.words, neg.words, .progress=.progress )
+	 scores.df = data.frame(score=scores, text=sentences)
+	 return(scores.df)
+}
+```
+
+
+Example / Sanity check
+
+```{r eval=FALSE}
+sample = c("You're awesome and I love you",
+"I hate and hate and hate. So angry. Die!",
+"Impressed and amazed: you are peerless in your achievement of unparalleled mediocrity.")
+
+result = score.sentiment(sample, pos.words, neg.words)
+
+```
+
+Score obama tweets
+```{r}
+result <- score.sentiment(obamacaretweets_text, pos.words, neg.words)
+
+# quick visualization of result
+hist(result$score)
 ```
 
 
@@ -32,4 +160,16 @@ usaMap <- ggmap(usa, extent = 'device', legend = 'topleft')
 usaMap
 ```
 
+Loading JSON Data
+-----------------
+
+Looks like there is twitter data saved in output.json
+
+Issues:
+Does not seem to read the whole file. Why?
+
+```{r}
+json_file <- "output.json"
+json_data <- fromJSON(paste(readLines(json_file), collapse=""))
+```
 
