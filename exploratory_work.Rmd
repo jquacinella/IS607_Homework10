@@ -1,5 +1,7 @@
-Exploratory Work
-================
+Sentiment Analysis of #Obamacare Tweets
+=======================================
+
+In this homework, Aaron Palumbo and James Quacinella used twitter data to analyze the sentiment of tweets about Obamacare.
 
 Required Packages
 -----------------
@@ -88,6 +90,8 @@ if(!file.exists("obamacaretweets_text")){
 Generating a Wordcloud
 ----------------------
 
+First, we'll do some basic text formatting (convert to lowercase, remove puncuations, remove stop words and remove the word 'obamacare') and then we'll produce a word cloud from the tweets.
+
 ```{r}
 # Create a corpus and turn it into a word cloud
 obamacaretweets_corpus <- Corpus(VectorSource(obamacaretweets_text))
@@ -168,13 +172,13 @@ result <- score.sentiment(obamacaretweets_text, pos.words, neg.words)
 hist(result$score)
 ```
 
-### Using ViralHeat API
+Using ViralHeat API
+-------------------
 
-original code: http://thinktostart.wordpress.com/2013/09/02/sentiment-analysis-on-twitter-with-viralheat-api/
+Using the API key of 6LUTxvF9YYYjKWEZZ7X, we'll use ViralHEat's API to get an alternative way of doing sentiment analysis. The getSentiment() function handles the queries we send to the API and splits the positive and negative statements out of the JSON reply and returns them in a list.
 
-API key: 6LUTxvF9YYYjKWEZZ7X
+Original code: http://thinktostart.wordpress.com/2013/09/02/sentiment-analysis-on-twitter-with-viralheat-api/
 
-The getSentiment() function handles the queries we send to the API and splits the positive and negative statements out of the JSON reply and returns them in a list.
 
 ```{r}
 getSentiment <- function (text, key){
@@ -213,7 +217,7 @@ return(list(mood=js$mood, score=score))
 }
 ```
 
-The clean.text() function
+### The clean.text() function
 
 We need this function because of the problems occurring when the tweets contain some certain characters and to remove characters like “@” and “RT”.
 
@@ -253,7 +257,8 @@ mcnum <- length(tweet_clean)
 tweet_df <- data.frame(text=tweet_clean, sentiment=rep("", mcnum), score=1:mcnum, stringsAsFactors=FALSE)
 ```
 
-Do the analysis:
+### Do the ViralHeat Analysis
+
 issue: slow - about 10 minutes to score 300 items
 issue: look into set dependency on this chuck. Needs to run if obamatweets_text changes
 
@@ -276,19 +281,11 @@ if (file.exists("tweet_df")){
 }  
 ```
 
-Display Results:
+### Results
 
 ```{r}
 hist(tweet_df$score)
 ```
-
-
-
-
-
-
-
-
 
 Plotting on maps
 ----------------
@@ -305,22 +302,72 @@ HoustonMap
 
 ### Map of USA
 
-```{r}
+```{r eval=FALSE}
 usa <- get_map('usa', zoom = 4)
 usaMap <- ggmap(usa, extent = 'device', legend = 'topleft')
 usaMap
 ```
 
-Loading JSON Data
------------------
-
-Looks like there is twitter data saved in output.json
-
-Issues:
-Does not seem to read the whole file. Why?
+### Map of NYC Tweets
 
 ```{r}
-json_file <- "output.json"
-json_data <- fromJSON(paste(readLines(json_file), collapse=""))
-```
+if (file.exists("filtered_nyc_tweets")){
+  load("filtered_nyc_tweets")
+} else {
+  
+  # Sign into twitter
+  load("twitteR_credentials")
+  registerTwitterOAuth(cred)# Bounding box for NYC
+  
+  # Bounding box for NYC
+  min_lon_nyc <- -74
+  min_lat_nyc <- 40
+  max_lon_nyc <- -73
+  max_lat_nyc <- 41
+  
+  # Stream tweets that are either obamacare or from NYC
+  filterStream(file="obama_nyc.json", track="#obamacare", locations=c(min_lon_nyc, min_lat_nyc, max_lon_nyc, max_lat_nyc), timeout=60, oauth=cred)
+  obama_tweet_stream <- parseTweets("obama_nyc.json")
+  
+  # Convert long and lat columns to decimals
+  obama_tweet_stream$lon <- as.numeric(obama_tweet_stream$lon)
+  obama_tweet_stream$lat <- as.numeric(obama_tweet_stream$lat)
+  
+  # Filter tweets that have geo information
+  filtered_nyc_tweets <- obama_tweet_stream[!is.na(obama_tweet_stream$lon) & 
+                                             !is.na(obama_tweet_stream$lat) &
+                                             obama_tweet_stream$lon >= min_lon_nyc &
+                                             obama_tweet_stream$lon <= max_lon_nyc & 
+                                             obama_tweet_stream$lat >= min_lat_nyc &
+                                             obama_tweet_stream$lat <= max_lat_nyc, ]
+  
+# Commented out this section, as there is no point in doing the sentiment analysis
+# right now. I was going to use this info to color and size the points on the map
+#   num_tweets <- nrow(filtered_nyc_tweets)
+#   filtered_nyc_tweets$sentiment <- rep(0, num_tweets)
+#   filtered_nyc_tweets$score <- rep(0, num_tweets)
+#   
+#   start.time <- Sys.time()
+#   for (i in 1:num_tweets){
+#     tmp <- getSentiment(filtered_nyc_tweets[i, 'text'], "6LUTxvF9YYYjKWEZZ7X")
+#     filtered_nyc_tweets$sentiment[i] <- tmp$mood
+#     filtered_nyc_tweets$score[i] <- tmp$score
+#     if (i %% 20 == 0){
+#       print(c(i, Sys.time() - start.time))
+#     }
+#   }
+  
+  save(filtered_nyc_tweets, file="filtered_nyc_tweets")
+}
 
+# Using the data itself, we can filter out the tweets that were far out
+lon_stats = boxplot(filtered_nyc_tweets$lon, plot=FALSE)$stats
+min_lon_data = lon_stats[2]
+max_lon_data = lon_stats[4]
+lat_stats = boxplot(filtered_nyc_tweets$lat, plot=FALSE)$stats
+min_lat_data = lat_stats[2]
+max_lat_data = lat_stats[4]
+
+# Generate a map of NYC with the tweets plotted
+nycMap <- qmap(location = c(min_lon_data, min_lat_data, max_lon_data, max_lat_data))
+nycMap + geom_point(aes(x=lon, y=lat), data=filtered_nyc_tweets)

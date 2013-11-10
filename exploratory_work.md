@@ -1,5 +1,7 @@
-Exploratory Work
-================
+Sentiment Analysis of #Obamacare Tweets
+=======================================
+
+In this homework, Aaron Palumbo and James Quacinella used twitter data to analyze the sentiment of tweets about Obamacare.
 
 Required Packages
 -----------------
@@ -7,7 +9,7 @@ Required Packages
 
 ```r
 list.of.packages <- c("ggplot2", "ggmap", "rjson", "ROAuth", "twitteR", "streamR", 
-    "wordcloud", "tm", "plyr")
+    "wordcloud", "tm", "plyr", "stringr", "RJSONIO")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[, 
     "Package"])]
 if (length(new.packages)) install.packages(new.packages)
@@ -19,6 +21,19 @@ library(ggmap)
 
 # JSON
 library(rjson)
+library(RJSONIO)
+```
+
+```
+## 
+## Attaching package: 'RJSONIO'
+## 
+## The following objects are masked from 'package:rjson':
+## 
+##     fromJSON, toJSON
+```
+
+```r
 
 # Twitter
 library("ROAuth")
@@ -42,9 +57,9 @@ library("wordcloud")
 ```
 
 ```r
-library("tm")
 
 # Text tools
+library("tm")
 library("plyr")
 ```
 
@@ -72,14 +87,18 @@ Taken from: http://davetang.org/muse/2013/04/06/using-the-r_twitter-package/
 
 
 ```r
-download.file(url = "http://curl.haxx.se/ca/cacert.pem", destfile = "cacert.pem")
-cred <- OAuthFactory$new(consumerKey = "hJFNU2CUnrWP7wtYrOmdw", consumerSecret = "mYpRIVG92xbk58rFg1UDwGH4xKryWpgyz3obaqDVqM", 
-    requestURL = "http://api.twitter.com/oauth/request_token", accessURL = "http://api.twitter.com/oauth/access_token", 
-    authURL = "http://api.twitter.com/oauth/authorize")
-cred$handshake(cainfo = "cacert.pem")
-# Enter in PIN
-registerTwitterOAuth(cred)
-save(list = "cred", file = "twitteR_credentials")
+if (!file.exists("twitteR_credentials")) {
+    download.file(url = "http://curl.haxx.se/ca/cacert.pem", destfile = "cacert.pem")
+    cred <- OAuthFactory$new(consumerKey = "hJFNU2CUnrWP7wtYrOmdw", consumerSecret = "mYpRIVG92xbk58rFg1UDwGH4xKryWpgyz3obaqDVqM", 
+        requestURL = "http://api.twitter.com/oauth/request_token", accessURL = "http://api.twitter.com/oauth/access_token", 
+        authURL = "http://api.twitter.com/oauth/authorize")
+    cred$handshake(cainfo = "cacert.pem")
+    # Enter in PIN
+    registerTwitterOAuth(cred)
+    save(list = "cred", file = "twitteR_credentials")
+} else {
+    print("Credentials exist")
+}
 ```
 
 
@@ -87,32 +106,37 @@ However, we'll just load the credentials from file.
 
 
 ```r
-# Sign into twitter
-load("twitteR_credentials")
-registerTwitterOAuth(cred)
-```
+# Check if obamacaretweets exists on disk, if not, create it.
+if (!file.exists("obamacaretweets")) {
+    # Sign into twitter
+    load("twitteR_credentials")
+    registerTwitterOAuth(cred)
+    
+    # Get Tweets on ObamaCare and store their text
+    obamacaretweets <- searchTwitter("#obamacare", n = 1500, cainfo = "cacert.pem")
+    
+    # Save to disk
+    save(obamacaretweets, file = "obamacaretweets")
+} else {
+    load("obamacaretweets")
+}
 
-```
-## [1] TRUE
-```
-
-```r
-
-# Get Tweets on ObamaCare and store their text
-obamacaretweets <- searchTwitter("#obamacare", n = 1500, cainfo = "cacert.pem")
-```
-
-```
-## Warning: 1500 tweets were requested but the API can only return 699
-```
-
-```r
-obamacaretweets_text <- sapply(obamacaretweets, function(x) x$getText())
+# Check if obamacaretweets_text exists on disk, if not, create it.
+if (!file.exists("obamacaretweets_text")) {
+    obamacaretweets_text <- sapply(obamacaretweets, function(x) x$getText())
+    
+    # Save to disk
+    save(obamacaretweets_text, file = "obamacaretweets_text")
+} else {
+    load("obamacaretweets_text")
+}
 ```
 
 
 Generating a Wordcloud
 ----------------------
+
+First, we'll do some basic text formatting (convert to lowercase, remove puncuations, remove stop words and remove the word 'obamacare') and then we'll produce a word cloud from the tweets.
 
 
 ```r
@@ -128,24 +152,11 @@ wordcloud(obamacaretweets_corpus)
 ```
 
 ```
-## Warning: conversion failure on 'fastandfurıous' in 'mbcsToSbcs': dot substituted for <c4>
-## Warning: conversion failure on 'fastandfurıous' in 'mbcsToSbcs': dot substituted for <b1>
-## Warning: conversion failure on 'fastandfurıous' in 'mbcsToSbcs': dot substituted for <c4>
-## Warning: conversion failure on 'fastandfurıous' in 'mbcsToSbcs': dot substituted for <b1>
-## Warning: font metrics unknown for Unicode character U+0131
-## Warning: httptcok2jpm4a7bh could not be fit on page. It will not be plotted.
-## Warning: teaparty could not be fit on page. It will not be plotted.
-## Warning: repmartharoby could not be fit on page. It will not be plotted.
-## Warning: mikandynothem could not be fit on page. It will not be plotted.
-## Warning: coming could not be fit on page. It will not be plotted.
-## Warning: httptcoodnwxz5twk could not be fit on page. It will not be plotted.
-## Warning: obama could not be fit on page. It will not be plotted.
-## Warning: remember could not be fit on page. It will not be plotted.
-## Warning: fridaykitty could not be fit on page. It will not be plotted.
-## Warning: mycancellation could not be fit on page. It will not be plotted.
-## Warning: democrats could not be fit on page. It will not be plotted.
-## Warning: affordable could not be fit on page. It will not be plotted.
-## Warning: felons could not be fit on page. It will not be plotted.
+## Warning: conversion failure on 'âœinhoc478' in 'mbcsToSbcs': dot substituted for <c5>
+## Warning: conversion failure on 'âœinhoc478' in 'mbcsToSbcs': dot substituted for <93>
+## Warning: conversion failure on 'âœinhoc478' in 'mbcsToSbcs': dot substituted for <c5>
+## Warning: conversion failure on 'âœinhoc478' in 'mbcsToSbcs': dot substituted for <93>
+## Warning: font metrics unknown for Unicode character U+0153
 ```
 
 ![plot of chunk unnamed-chunk-4](figure/unnamed-chunk-4.png) 
@@ -154,68 +165,70 @@ wordcloud(obamacaretweets_corpus)
 Analyzing Sentiment
 -------------------
 
+### Jeffrey Breen method:
+
 Download Hu & Liu’s opinion lexicon:
 site - http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html
 files - http://www.cs.uic.edu/~liub/FBS/opinion-lexicon-English.rar (downloaded Nov. 8, 2013)
 
 
 ```r
-pos.words = scan("positive-words.txt", what = "character", comment.char = ";")
-neg.words = scan("negative-words.txt", what = "character", comment.char = ";")
+pos.words <- scan("positive-words.txt", what = "character", comment.char = ";")
+neg.words <- scan("negative-words.txt", what = "character", comment.char = ";")
 ```
 
 
-### Score sentiment function per Jeffrey Breen
+#### Score sentiment function per Jeffrey Breen
 
 
 ```r
-score.sentiment = function(sentences, pos.words, neg.words, .progress = "none") {
+score.sentiment <- function(sentences, pos.words, neg.words, .progress = "none") {
     # we got a vector of sentences. plyr will handle a list or a vector as an
     # 'l' for us we want a simple array of scores back, so we use 'l' + 'a' +
     # 'ply' = laply:
-    scores = laply(sentences, function(sentence, pos.words, neg.words) {
+    scores <- laply(sentences, function(sentence, pos.words, neg.words) {
         
         # clean up sentences with R's regex-driven global substitute, gsub():
-        sentence = gsub("[[:punct:]]", "", sentence)
-        sentence = gsub("[[:cntrl:]]", "", sentence)
-        sentence = gsub("\\d+", "", sentence)
+        sentence <- gsub("[[:punct:]]", "", sentence)
+        sentence <- gsub("[[:cntrl:]]", "", sentence)
+        sentence <- gsub("\\d+", "", sentence)
         # and convert to lower case:
-        sentence = tolower(sentence)
+        sentence <- tolower(sentence)
         # split into words. str_split is in the stringr package
-        word.list = str_split(sentence, "\\s+")
+        word.list <- str_split(sentence, "\\s+")
         # sometimes a list() is one level of hierarchy too much
-        words = unlist(word.list)
+        words <- unlist(word.list)
         # compare our words to the dictionaries of positive & negative terms
-        pos.matches = match(words, pos.words)
-        neg.matches = match(words, neg.words)
+        pos.matches <- match(words, pos.words)
+        neg.matches <- match(words, neg.words)
         
         # match() returns the position of the matched term or NA we just want a
         # TRUE/FALSE:
-        pos.matches = !is.na(pos.matches)
-        neg.matches = !is.na(neg.matches)
+        pos.matches <- !is.na(pos.matches)
+        neg.matches <- !is.na(neg.matches)
         # and conveniently enough, TRUE/FALSE will be treated as 1/0 by sum():
-        score = sum(pos.matches) - sum(neg.matches)
+        score <- sum(pos.matches) - sum(neg.matches)
         return(score)
     }, pos.words, neg.words, .progress = .progress)
-    scores.df = data.frame(score = scores, text = sentences)
+    scores.df <- data.frame(score = scores, text = sentences)
     return(scores.df)
 }
 ```
 
 
-### Example / Sanity check
+#### Example / Sanity check
 
 
 ```r
 sample = c("You're awesome and I love you", "I hate and hate and hate. So angry. Die!", 
     "Impressed and amazed: you are peerless in your achievement of unparalleled mediocrity.")
 
-result = score.sentiment(sample, pos.words, neg.words)
+result <- score.sentiment(sample, pos.words, neg.words)
 
 ```
 
 
-### Score Obamacare Tweets
+#### Score Obamacare Tweets
 
 
 ```r
@@ -228,6 +241,135 @@ hist(result$score)
 ![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8.png) 
 
 
+Using ViralHeat API
+-------------------
+
+Using the API key of 6LUTxvF9YYYjKWEZZ7X, we'll use ViralHEat's API to get an alternative way of doing sentiment analysis. The getSentiment() function handles the queries we send to the API and splits the positive and negative statements out of the JSON reply and returns them in a list.
+
+Original code: http://thinktostart.wordpress.com/2013/09/02/sentiment-analysis-on-twitter-with-viralheat-api/
+
+
+
+```r
+getSentiment <- function(text, key) {
+    library(RCurl)
+    library(RJSONIO)
+    
+    text <- URLencode(text, reserved = TRUE)
+    
+    # save all the spaces, then get rid of the weird characters that break the
+    # API, then convert back the URL-encoded spaces.
+    text <- str_replace_all(text, "%20", " ")
+    text <- str_replace_all(text, "%\\d\\d", "")
+    text <- str_replace_all(text, " ", "%20")
+    
+    if (str_length(text) > 360) {
+        text <- substr(text, 0, 359)
+    }
+    
+    data <- getURL(paste("https://www.viralheat.com/api/sentiment/review.json?api_key=", 
+        key, "&text=", text, sep = ""), cainfo = "cacert.pem")
+    
+    js <- fromJSON(data, asText = TRUE)
+    
+    # get mood probability
+    score <- js$prob
+    
+    # positive, negative or neutral?
+    if (js$mood != "positive") {
+        if (js$mood == "negative") {
+            score <- -1 * score
+        } else {
+            # neutral
+            score <- 0
+        }
+    }
+    
+    return(list(mood = js$mood, score = score))
+}
+```
+
+
+### The clean.text() function
+
+We need this function because of the problems occurring when the tweets contain some certain characters and to remove characters like “@” and “RT”.
+
+
+```r
+clean.text <- function(some_txt) {
+    some_txt <- gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", some_txt)
+    some_txt <- gsub("@\\w+", "", some_txt)
+    some_txt <- gsub("[[:punct:]]", "", some_txt)
+    some_txt <- gsub("[[:digit:]]", "", some_txt)
+    some_txt <- gsub("http\\w+", "", some_txt)
+    some_txt <- gsub("[ \t]{2,}", "", some_txt)
+    some_txt <- gsub("^\\s+|\\s+$", "", some_txt)
+    some_txt <- gsub("([^a-zA-Z0-9 ])", "", some_txt)  # added by ajp - this strip out everything except letters, numbers, and spaces
+    # this renders all the above substitution obsolete
+    
+    # define 'tolower error handling' function
+    try.tolower <- function(x) {
+        y <- NA
+        try_error <- tryCatch(tolower(x), error = function(e) e)
+        if (!inherits(try_error, "error")) 
+            y <- tolower(x)
+        return(y)
+    }
+    
+    some_txt <- sapply(some_txt, try.tolower)
+    some_txt <- some_txt[some_txt != ""]
+    names(some_txt) <- NULL
+    return(some_txt)
+}
+```
+
+
+We already have the tweets from above, now we need to clean them
+
+
+```r
+tweet_clean <- clean.text(obamacaretweets_text)
+mcnum <- length(tweet_clean)
+tweet_df <- data.frame(text = tweet_clean, sentiment = rep("", mcnum), score = 1:mcnum, 
+    stringsAsFactors = FALSE)
+```
+
+
+### Do the ViralHeat Analysis
+
+issue: slow - about 10 minutes to score 300 items
+issue: look into set dependency on this chuck. Needs to run if obamatweets_text changes
+
+
+```r
+if (file.exists("tweet_df")) {
+    load("tweet_df")
+} else {
+    sentiment <- rep(0, mcnum)  # what is this used for?
+    start.time <- Sys.time()
+    for (i in 1:mcnum) {
+        tmp <- getSentiment(tweet_clean[i], "6LUTxvF9YYYjKWEZZ7X")
+        tweet_df$sentiment[i] <- tmp$mood
+        tweet_df$score[i] <- tmp$score
+        if (i%%20 == 0) {
+            func.time <- Sys.time()
+            print(c(i, func.time - start.time))
+        }
+    }
+    save(tweet_df, file = "tweet_df")
+}
+```
+
+
+### Results
+
+
+```r
+hist(tweet_df$score)
+```
+
+![plot of chunk unnamed-chunk-13](figure/unnamed-chunk-13.png) 
+
 
 Plotting on maps
 ----------------
@@ -239,21 +381,9 @@ Lots of good info here: https://dl.dropboxusercontent.com/u/24648660/ggmap%20use
 
 ```r
 houston <- get_map("houston", zoom = 14)
-```
-
-```
-## Map from URL : http://maps.googleapis.com/maps/api/staticmap?center=houston&zoom=14&size=%20640x640&scale=%202&maptype=terrain&sensor=false
-## Google Maps API Terms of Service : http://developers.google.com/maps/terms
-## Information from URL : http://maps.googleapis.com/maps/api/geocode/json?address=houston&sensor=false
-## Google Maps API Terms of Service : http://developers.google.com/maps/terms
-```
-
-```r
 HoustonMap <- ggmap(houston, extent = "device", legend = "topleft")
 HoustonMap
 ```
-
-![plot of chunk unnamed-chunk-9](figure/unnamed-chunk-9.png) 
 
 
 ### Map of USA
@@ -261,35 +391,97 @@ HoustonMap
 
 ```r
 usa <- get_map("usa", zoom = 4)
-```
-
-```
-## Map from URL : http://maps.googleapis.com/maps/api/staticmap?center=usa&zoom=4&size=%20640x640&scale=%202&maptype=terrain&sensor=false
-## Google Maps API Terms of Service : http://developers.google.com/maps/terms
-## Information from URL : http://maps.googleapis.com/maps/api/geocode/json?address=usa&sensor=false
-## Google Maps API Terms of Service : http://developers.google.com/maps/terms
-```
-
-```r
 usaMap <- ggmap(usa, extent = "device", legend = "topleft")
 usaMap
 ```
 
-![plot of chunk unnamed-chunk-10](figure/unnamed-chunk-10.png) 
 
-
-Loading JSON Data
------------------
-
-Looks like there is twitter data saved in output.json
-
-Issues:
-Does not seem to read the whole file. Why?
+### Map of NYC Tweets
 
 
 ```r
-json_file <- "output.json"
-json_data <- fromJSON(paste(readLines(json_file), collapse = ""))
+if (file.exists("filtered_nyc_tweets")) {
+    load("filtered_nyc_tweets")
+} else {
+    
+    # Sign into twitter
+    load("twitteR_credentials")
+    registerTwitterOAuth(cred)  # Bounding box for NYC
+    
+    # Bounding box for NYC
+    min_lon_nyc <- -74
+    min_lat_nyc <- 40
+    max_lon_nyc <- -73
+    max_lat_nyc <- 41
+    
+    # Stream tweets that are either obamacare or from NYC
+    filterStream(file = "obama_nyc.json", track = "#obamacare", locations = c(min_lon_nyc, 
+        min_lat_nyc, max_lon_nyc, max_lat_nyc), timeout = 60, oauth = cred)
+    obama_tweet_stream <- parseTweets("obama_nyc.json")
+    
+    # Convert long and lat columns to decimals
+    obama_tweet_stream$lon <- as.numeric(obama_tweet_stream$lon)
+    obama_tweet_stream$lat <- as.numeric(obama_tweet_stream$lat)
+    
+    # Filter tweets that have geo information
+    filtered_nyc_tweets <- obama_tweet_stream[!is.na(obama_tweet_stream$lon) & 
+        !is.na(obama_tweet_stream$lat) & obama_tweet_stream$lon >= min_lon_nyc & 
+        obama_tweet_stream$lon <= max_lon_nyc & obama_tweet_stream$lat >= min_lat_nyc & 
+        obama_tweet_stream$lat <= max_lat_nyc, ]
+    
+    # Commented out this section, as there is no point in doing the sentiment
+    # analysis right now. I was going to use this info to color and size the
+    # points on the map num_tweets <- nrow(filtered_nyc_tweets)
+    # filtered_nyc_tweets$sentiment <- rep(0, num_tweets)
+    # filtered_nyc_tweets$score <- rep(0, num_tweets) start.time <- Sys.time()
+    # for (i in 1:num_tweets){ tmp <- getSentiment(filtered_nyc_tweets[i,
+    # 'text'], '6LUTxvF9YYYjKWEZZ7X') filtered_nyc_tweets$sentiment[i] <-
+    # tmp$mood filtered_nyc_tweets$score[i] <- tmp$score if (i %% 20 == 0){
+    # print(c(i, Sys.time() - start.time)) } }
+    
+    save(filtered_nyc_tweets, file = "filtered_nyc_tweets")
+}
 ```
 
+```
+## Capturing tweets...
+## Connection to Twitter stream was closed after 60 seconds with 403 kB received.
+```
 
+```
+## 318 tweets have been parsed.
+```
+
+```r
+
+# Using the data itself, we can filter out the tweets that were far out
+lon_stats = boxplot(filtered_nyc_tweets$lon, plot = FALSE)$stats
+min_lon_data = lon_stats[2]
+max_lon_data = lon_stats[4]
+lat_stats = boxplot(filtered_nyc_tweets$lat, plot = FALSE)$stats
+min_lat_data = lat_stats[2]
+max_lat_data = lat_stats[4]
+
+# Generate a map of NYC with the tweets plotted
+nycMap <- qmap(location = c(min_lon_data, min_lat_data, max_lon_data, max_lat_data))
+```
+
+```
+## Warning: bounding box given to google - spatial extent only approximate.
+```
+
+```
+## converting bounding box to center/zoom specification. (experimental)
+## Map from URL : http://maps.googleapis.com/maps/api/staticmap?center=40.774446,-73.854461&zoom=10&size=%20640x640&scale=%202&maptype=terrain&sensor=false
+## Google Maps API Terms of Service : http://developers.google.com/maps/terms
+```
+
+```r
+nycMap + geom_point(aes(x = lon, y = lat), data = filtered_nyc_tweets)
+```
+
+```
+## Warning: Removed 25 rows containing missing values (geom_point).
+```
+
+![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16.png) 

@@ -11,6 +11,7 @@ if (file.exists("filtered_nyc_tweets")){
   max_lon_nyc <- -73
   max_lat_nyc <- 41
   
+  # Stream tweets that are either obamacare or from NYC
   filterStream(file="obama_nyc.json", track="#obamacare", locations=c(min_lon_nyc, min_lat_nyc, max_lon_nyc, max_lat_nyc), timeout=60, oauth=cred)
   obama_tweet_stream <- parseTweets("obama_nyc.json")
   
@@ -26,7 +27,8 @@ if (file.exists("filtered_nyc_tweets")){
                                              obama_tweet_stream$lat >= min_lat_nyc &
                                              obama_tweet_stream$lat <= max_lat_nyc, ]
   
-
+# Commented out this section, as there is no point in doing the sentiment analysis
+# right now. I was going to use this info to color and size the points on the map
 #   num_tweets <- nrow(filtered_nyc_tweets)
 #   filtered_nyc_tweets$sentiment <- rep(0, num_tweets)
 #   filtered_nyc_tweets$score <- rep(0, num_tweets)
@@ -44,14 +46,14 @@ if (file.exists("filtered_nyc_tweets")){
   save(filtered_nyc_tweets, file="filtered_nyc_tweets")
 }
 
+# Using the data itself, we can filter out the tweets that were far out
 lon_stats = boxplot(filtered_nyc_tweets$lon, plot=FALSE)$stats
 min_lon_data = lon_stats[2]
 max_lon_data = lon_stats[4]
-
 lat_stats = boxplot(filtered_nyc_tweets$lat, plot=FALSE)$stats
 min_lat_data = lat_stats[2]
 max_lat_data = lat_stats[4]
 
+# Generate a map of NYC with the tweets plotted
 nycMap <- qmap(location = c(min_lon_data, min_lat_data, max_lon_data, max_lat_data))
-nycMap
 nycMap + geom_point(aes(x=lon, y=lat), data=filtered_nyc_tweets)
