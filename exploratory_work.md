@@ -152,11 +152,11 @@ wordcloud(obamacaretweets_corpus)
 ```
 
 ```
-## Warning: conversion failure on 'âœinhoc478' in 'mbcsToSbcs': dot substituted for <c5>
-## Warning: conversion failure on 'âœinhoc478' in 'mbcsToSbcs': dot substituted for <93>
-## Warning: conversion failure on 'âœinhoc478' in 'mbcsToSbcs': dot substituted for <c5>
-## Warning: conversion failure on 'âœinhoc478' in 'mbcsToSbcs': dot substituted for <93>
-## Warning: font metrics unknown for Unicode character U+0153
+## Warning: font width unknown for character 0x9d
+## Warning: font width unknown for character 0x9d
+## Warning: font width unknown for character 0x9d
+## Warning: font width unknown for character 0x9d
+## Warning: font metrics unknown for character 0x9d
 ```
 
 ![plot of chunk unnamed-chunk-4](figure/unnamed-chunk-4.png) 
@@ -167,7 +167,7 @@ Analyzing Sentiment
 
 ### Jeffrey Breen method:
 
-Download Hu & Liu’s opinion lexicon:
+Download Hu & Lius opinion lexicon:
 site - http://www.cs.uic.edu/~liub/FBS/sentiment-analysis.html
 files - http://www.cs.uic.edu/~liub/FBS/opinion-lexicon-English.rar (downloaded Nov. 8, 2013)
 
@@ -229,6 +229,15 @@ result <- score.sentiment(sample, pos.words, neg.words)
 
 
 #### Score Obamacare Tweets
+
+It's interesting to note that using this technique, all you need to do to get a really negative score is repeat yourself. The tweet with the most negative score (-14) is:  
+  
+> obamacare lied lied lied lied lied lied lied lied lied lied lied lied lied whew that wasnt hard now u dems try itall together nowobamacare lied lied lied lied lied lied lied lied lied lied lied lied lied whew that wasnt hard now u dems try itall together now  
+
+Compare that to this one with a score of (-1):
+
+> crush the marxists obama obamacare defundobamacare defundthegop defundtherinos makedclisten tcot tlot teaparty gop rinos rnc  
+
 
 
 ```r
@@ -292,7 +301,7 @@ getSentiment <- function(text, key) {
 
 ### The clean.text() function
 
-We need this function because of the problems occurring when the tweets contain some certain characters and to remove characters like “@” and “RT”.
+We need this function because of the problems occurring when the tweets contain some certain characters and to remove characters like @ and RT.
 
 
 ```r
@@ -304,8 +313,8 @@ clean.text <- function(some_txt) {
     some_txt <- gsub("http\\w+", "", some_txt)
     some_txt <- gsub("[ \t]{2,}", "", some_txt)
     some_txt <- gsub("^\\s+|\\s+$", "", some_txt)
-    some_txt <- gsub("([^a-zA-Z0-9 ])", "", some_txt)  # added by ajp - this strip out everything except letters, numbers, and spaces
-    # this renders all the above substitution obsolete
+    some_txt <- gsub("([^a-zA-Z0-9 ])", "", some_txt)  # this takes whatever is left and
+    # removes anything that isn't a letter, number, or space
     
     # define 'tolower error handling' function
     try.tolower <- function(x) {
@@ -338,7 +347,7 @@ tweet_df <- data.frame(text = tweet_clean, sentiment = rep("", mcnum), score = 1
 ### Do the ViralHeat Analysis
 
 issue: slow - about 10 minutes to score 300 items
-issue: look into set dependency on this chuck. Needs to run if obamatweets_text changes
+issue: look into set dependency on this chunk. Needs to run if obamatweets_text changes
 
 
 ```r
@@ -370,6 +379,75 @@ hist(tweet_df$score)
 
 ![plot of chunk unnamed-chunk-13](figure/unnamed-chunk-13.png) 
 
+
+### Compare results from the two techniques
+
+Merge the two data sets:
+
+
+```r
+
+n <- nrow(tweet_df)
+tweet_df$jbscore <- result$score
+
+# Order the data by score from ViralHeat
+tweet_df <- tweet_df[order(tweet_df$score), ]
+vh <- tweet_df$score
+
+# Scale jbscore by dividing score by total words from tweet This puts the
+# two algorithms on rought the same scale
+count_words <- function(text) {
+    sapply(gregexpr("\\W+", text), length) + 1
+}
+word.count <- lapply(tweet_df$text, count_words)
+jb <- tweet_df$jbscore/as.numeric(word.count)
+```
+
+
+Create a plot to visualize the differences:
+
+
+```r
+par(mar = c(5.1, 4.1, 4.1, 2.1) * 1)  # Use this to adjust axes default is par(mar = c(5.1, 4.1, 4,1, 2,1))
+
+plot(1:10, type = "n", xlim = c(0, n), ylim = c(-1, 1), xlab = "Tweet Index", 
+    ylab = "Magnitude of Sentiment", main = "Comparison of Sentiment Rating Methods")
+
+for (i in 1:n) {
+    color = "green"
+    if (vh[i] * jb[i] < 0) {
+        color = "red"
+    }
+    if (jb[i] == 0) {
+        color = "grey"
+    }
+    segments(i, vh[i], i, jb[i], col = color, lwd = 3)
+}
+points(vh, pch = 19)
+points(jb, pch = 19, col = "blue")
+
+legend("topleft", inset = 0.01, c("Scores from ViralHeat", "Scores from Breen Method"), 
+    pch = 19, col = c("black", "blue"))
+legend("bottomright", inset = 0.01, c("Sentiment rating agrees", "Sentiment rating disagrees", 
+    "Breen returned score of 0"), lty = c("solid", "solid", "solid"), lwd = 3, 
+    col = c("green", "red", "grey"))
+abline(h = 0)
+```
+
+![plot of chunk unnamed-chunk-15](figure/unnamed-chunk-15.png) 
+
+
+
+Looking at the above figure we can see quite a bit of discrepency between the two methods. Since the data is sorted by the ViralHeat score, we would expect to see green on the outside of the graph and red and grey in the middle. There is maybe some hint of that with the grey, but the red does not seem to folow that pattern. From this, we can conclude that there is not good agreement between the two methods.
+
+Conclusion
+----------
+
+From our results, sentiment analysis appears to be a difficult task that is subject to a large error. It would be interesting to also analyze results form Alchemy API to see if that had better corrleation to one of the methods. Also, it would be interesting to manually rate some number of these tweets to determine an overall accuracy. Another option that was considered was to plot the tweets on a map to see if patterns in location could be discerned from the data. Some progress was made, as can be seen in the appendix, but several issues need to be resolved before this can be used.
+
+
+Appendix
+--------
 
 Plotting on maps
 ----------------
@@ -441,18 +519,6 @@ if (file.exists("filtered_nyc_tweets")) {
     
     save(filtered_nyc_tweets, file = "filtered_nyc_tweets")
 }
-```
-
-```
-## Capturing tweets...
-## Connection to Twitter stream was closed after 60 seconds with 403 kB received.
-```
-
-```
-## 318 tweets have been parsed.
-```
-
-```r
 
 # Using the data itself, we can filter out the tweets that were far out
 lon_stats = boxplot(filtered_nyc_tweets$lon, plot = FALSE)$stats
@@ -472,7 +538,7 @@ nycMap <- qmap(location = c(min_lon_data, min_lat_data, max_lon_data, max_lat_da
 
 ```
 ## converting bounding box to center/zoom specification. (experimental)
-## Map from URL : http://maps.googleapis.com/maps/api/staticmap?center=40.774446,-73.854461&zoom=10&size=%20640x640&scale=%202&maptype=terrain&sensor=false
+## Map from URL : http://maps.googleapis.com/maps/api/staticmap?center=40.775877,-73.825461&zoom=10&size=%20640x640&scale=%202&maptype=terrain&sensor=false
 ## Google Maps API Terms of Service : http://developers.google.com/maps/terms
 ```
 
@@ -481,7 +547,59 @@ nycMap + geom_point(aes(x = lon, y = lat), data = filtered_nyc_tweets)
 ```
 
 ```
-## Warning: Removed 25 rows containing missing values (geom_point).
+## Warning: Removed 22 rows containing missing values (geom_point).
 ```
 
-![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16.png) 
+![plot of chunk unnamed-chunk-18](figure/unnamed-chunk-18.png) 
+
+
+
+### Radius search example
+
+This has some issues
+
+
+```r
+twitterMap <- function(searchtext, locations, radius) {
+    require(ggplot2)
+    require(maps)
+    require(twitteR)
+    # radius from randomly chosen location
+    radius = radius
+    lat <- runif(n = locations, min = 24.446667, max = 49.384472)
+    long <- runif(n = locations, min = -124.733056, max = -66.949778)
+    # generate data fram with random longitude, latitude and chosen radius
+    coordinates <- as.data.frame(cbind(lat, long, radius))
+    coordinates$lat <- lat
+    coordinates$long <- long
+    # create a string of the lat, long, and radius for entry into
+    # searchTwitter()
+    for (i in 1:length(coordinates$lat)) {
+        coordinates$search.twitter.entry[i] <- toString(c(coordinates$lat[i], 
+            coordinates$long[i], radius))
+    }
+    # take out spaces in the string
+    coordinates$search.twitter.entry <- gsub(" ", "", coordinates$search.twitter.entry, 
+        fixed = TRUE)
+    
+    # Search twitter at each location, check how many tweets and put into
+    # dataframe
+    for (i in 1:length(coordinates$lat)) {
+        coordinates$number.of.tweets[i] <- length(searchTwitter(searchString = searchtext, 
+            n = 1000, geocode = coordinates$search.twitter.entry[i]))
+    }
+    # making the US map
+    all_states <- map_data("state")
+    # plot all points on the map
+    p <- ggplot()
+    p <- p + geom_polygon(data = all_states, aes(x = long, y = lat, group = group), 
+        colour = "grey", fill = NA)
+    
+    p <- p + geom_point(data = coordinates, aes(x = long, y = lat, color = number.of.tweets)) + 
+        scale_size(name = "# of tweets")
+    p
+}
+# Example
+searchTwitter("obamacare", 15, "10mi")
+```
+
