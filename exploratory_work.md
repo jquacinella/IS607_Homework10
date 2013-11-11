@@ -384,6 +384,9 @@ hist(tweet_df$score)
 
 Merge the two data sets:
 
+One of the issues in comparing these two methods of sentiment analysis is that the scale used to rank the sentiment is entirely different. In the Jeffrey Breen method we simply count positive and negative words, in the ViralHeat API we get a positive or negative percentage that expresses how confident we are in the sentiment. In order to put plot these on the same scale, I modifed the Breen approach slightly; instead of just reporting the the sum of the positive and negative words, I divide that sum by the total number of words in the tweet. In that way, I make sure that the two methods are at least on the same scale, even if their magnitudes mean something slightly different. In the end, the graphic below is useful to see how strongly each method rated the tweet, but the exact delta in amplitudes is not really significant.
+
+
 
 ```r
 
